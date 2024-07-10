@@ -40,8 +40,6 @@ The AI agent for this Connect Four game uses a Minimax algorithm with alpha-beta
     python app.py
     ```
 
-4. Access the application in your web browser at local host.
-
 ## Acknowledgements
 
 This project was inspired by the classic Connect Four game. Special thanks to all contributors and developers who have worked on similar projects and shared their knowledge online.
