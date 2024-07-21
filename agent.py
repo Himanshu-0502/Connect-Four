@@ -53,6 +53,7 @@ def count_windows(bitboard, discs, piece):
             if bitboard[piece - 1] & (1 << shift):
                 window += 1
         return 1 if window == discs else 0
+
     n_windows = 0
     for row in range(ROWS):
         for col in range(COLUMNS - IN_A_ROW + 1):
