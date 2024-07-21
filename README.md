@@ -26,7 +26,6 @@ The agent for this Connect Four game uses a Minimax algorithm with alpha-beta pr
 ## Installation
 
 1. Clone the repository:
-
     ```sh
     git clone https://github.com/Himanshu-0502/Connect-Four.git
     cd Connect-Four
