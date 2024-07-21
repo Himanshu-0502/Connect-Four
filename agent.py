@@ -12,7 +12,7 @@ DEPTH_LIMIT = 5
 # Transposition table to store heuristic scores
 transposition_table = {}
 
-def grid_to_bitboard(grid):
+def get_bitboard(grid):
     """Convert the grid to a bitboard representation."""
     bitboard = np.array([0, 0], dtype=np.int64)
     for row in range(ROWS):
@@ -20,17 +20,6 @@ def grid_to_bitboard(grid):
             if grid[row][col] != 0:
                 bitboard[grid[row][col] - 1] ^= (1 << ((ROWS - 1) - row + col * COLUMNS))
     return bitboard
-
-def bitboard_to_grid(bitboard):
-    """Convert the bitboard to grid representation."""
-    grid = np.zeros((ROWS, COLUMNS), dtype=np.int64)
-    for row in range(ROWS):
-        for col in range(COLUMNS):
-            if bitboard[0] & (1 << ((ROWS - 1) - row + col * COLUMNS)):
-                grid[row][col] = 1
-            elif bitboard[1] & (1 << ((ROWS - 1) - row + col * COLUMNS)):
-                grid[row][col] = 2
-    return grid
 
 def get_height(grid):
     """Calculate the height of pieces in each column."""
@@ -53,43 +42,43 @@ def remove_piece(bitboard, height, col, piece):
     bitboard[piece - 1] ^= (1 << height[col])
     return bitboard, height
 
-def check_window(window, discs, piece):
-    """Check if a window meets the criteria."""
-    return np.count_nonzero(window == piece) == discs and np.count_nonzero(window == 0) == IN_A_ROW - discs
-
-def count_windows(grid, discs, piece):
-    """Count the number of valid windows in the grid."""
+def count_windows(bitboard, discs, piece):
+    """Count the number of valid windows in the bitboard."""
+    def check_window(shift_values):
+        """Check if a window is valid."""
+        window = 0
+        for shift in shift_values:
+            if bitboard[(piece % 2)] & (1 << shift):
+                return 0
+            if bitboard[piece - 1] & (1 << shift):
+                window += 1
+        return 1 if window == discs else 0
     n_windows = 0
     for row in range(ROWS):
         for col in range(COLUMNS - IN_A_ROW + 1):
-            window = grid[row, col:col + IN_A_ROW]
-            if check_window(window, discs, piece):
-                n_windows += 1
+            shifts = [(ROWS - 1) - row + (col + i) * COLUMNS for i in range(IN_A_ROW)]
+            n_windows += check_window(shifts)
     for row in range(ROWS - IN_A_ROW + 1):
         for col in range(COLUMNS):
-            window = grid[row:row + IN_A_ROW, col]
-            if check_window(window, discs, piece):
-                n_windows += 1
+            shifts = [(ROWS - 1) - (row + i) + col * COLUMNS for i in range(IN_A_ROW)]
+            n_windows += check_window(shifts)
     for row in range(ROWS - IN_A_ROW + 1):
         for col in range(COLUMNS - IN_A_ROW + 1):
-            window = grid[range(row, row + IN_A_ROW), range(col, col + IN_A_ROW)]
-            if check_window(window, discs, piece):
-                n_windows += 1
+            shifts = [(ROWS - 1) - (row + i) + (col + i) * COLUMNS for i in range(IN_A_ROW)]
+            n_windows += check_window(shifts)
     for row in range(IN_A_ROW - 1, ROWS):
         for col in range(COLUMNS - IN_A_ROW + 1):
-            window = grid[range(row, row - IN_A_ROW, -1), range(col, col + IN_A_ROW)]
-            if check_window(window, discs, piece):
-                n_windows += 1
+            shifts = [(ROWS - 1) - (row - i) + (col + i) * COLUMNS for i in range(IN_A_ROW)]
+            n_windows += check_window(shifts)
     return n_windows
 
 def get_heuristic(bitboard, piece):
     """Calculate the heuristic score of the bitboard."""
-    grid = bitboard_to_grid(bitboard)
     score = 0
-    score += 1e9 * count_windows(grid, IN_A_ROW - 0, piece)
-    score -= 1e6 * count_windows(grid, IN_A_ROW - 0, (piece % 2) + 1)
-    score += 1e3 * count_windows(grid, IN_A_ROW - 1, piece)
-    score -= 1e0 * count_windows(grid, IN_A_ROW - 1, (piece % 2) + 1)
+    score += 1e9 * count_windows(bitboard, IN_A_ROW - 0, piece)
+    score -= 1e6 * count_windows(bitboard, IN_A_ROW - 0, (piece % 2) + 1)
+    score += 1e3 * count_windows(bitboard, IN_A_ROW - 1, piece)
+    score -= 1e0 * count_windows(bitboard, IN_A_ROW - 1, (piece % 2) + 1)
     return score
 
 def is_draw(height):
@@ -163,7 +152,7 @@ def play(bitboard, height, piece, valid_moves):
     """Play a move using iterative deepening."""
     start_time = time.time()
     max_depth, max_time = 1, 0
-    while max_depth <= DEPTH_LIMIT and max_time <= TIME_LIMIT:
+    while max_depth <= DEPTH_LIMIT or max_time <= TIME_LIMIT:
         transposition_table.clear()
         valid_moves = sorted(valid_moves, key=lambda col: score_move(bitboard, height, max_depth, piece, col), reverse=True)
         max_depth, max_time = max_depth + 1, time.time() - start_time
@@ -173,7 +162,7 @@ def agent(observation, configuration):
     """Agent to play the game."""
     grid = np.asarray(observation['board'], dtype=np.int64).reshape(ROWS, COLUMNS)
     piece = observation['mark']
-    bitboard = grid_to_bitboard(grid)
+    bitboard = get_bitboard(grid)
     height = get_height(grid)
     valid_moves = [col for col in range(COLUMNS) if height[col] != (ROWS + col * COLUMNS)]
     rd.shuffle(valid_moves)
